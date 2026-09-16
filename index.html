@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>大富豪オンライン</title>
+<style>
+  :root{
+    --felt: #0b3d2e;
+    --felt-dark: #082a20;
+    --felt-line: rgba(244,239,227,0.12);
+    --ivory: #fbf6ec;
+    --ink: #232323;
+    --red: #a83a3a;
+    --gold: #c9a24b;
+    --gold-soft: rgba(201,162,75,0.16);
+    --text: #f4efe3;
+    --text-dim: rgba(244,239,227,0.6);
+    --font-display: Georgia, "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    --font-ui: "Hiragino Kaku Gothic ProN", "Yu Gothic Medium", "Yu Gothic", "Noto Sans JP", sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse at 50% -10%, rgba(255,255,255,0.05), transparent 60%),
+      linear-gradient(180deg, var(--felt) 0%, var(--felt-dark) 100%);
+    color:var(--text);
+    font-family:var(--font-ui);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    overflow-x:hidden;
+  }
+  .wrap{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    max-width:480px;
+    margin:0 auto;
+    width:100%;
+    padding:20px 16px 16px;
+    position:relative;
+  }
+  .brand{
+    font-family:var(--font-display);
+    letter-spacing:0.04em;
+    text-align:center;
+    color:var(--gold);
+    font-size:15px;
+    margin-bottom:2px;
+    opacity:0.9;
+  }
+  .brand small{display:block; font-family:var(--font-ui); color:var(--text-dim); font-size:11px; letter-spacing:0.08em; margin-top:2px;}
+
+  /* ---- Home / setup screens ---- */
+  .center-screen{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:22px;
+    padding:20px 0;
+  }
+  .title-block{text-align:center;}
+  .title-block h1{
+    font-family:var(--font-display);
+    font-weight:400;
+    font-size:34px;
+    margin:0 0 6px;
+    letter-spacing:0.02em;
+  }
+  .title-block p{margin:0; color:var(--text-dim); font-size:13px;}
+  .suit-row{font-size:20px; letter-spacing:10px; margin-top:10px; opacity:0.85;}
+  .suit-row .r{color:var(--red);}
+
+  .field-box{
+    width:100%;
+    max-width:320px;
+  }
+  input[type=text]{
+    width:100%;
+    background:rgba(0,0,0,0.2);
+    border:1px solid var(--felt-line);
+    border-radius:10px;
+    padding:13px 14px;
+    color:var(--text);
+    font-size:16px;
+    font-family:var(--font-ui);
+    outline:none;
+  }
+  input[type=text]:focus{border-color:var(--gold);}
+  input[type=text]::placeholder{color:rgba(244,239,227,0.35);}
+  input.code-input{
+    text-transform:uppercase;
+    letter-spacing:0.3em;
+    text-align:center;
+    font-family:var(--font-display);
+    font-size:20px;
+  }
+  label.field-label{
+    display:block;
+    font-size:12px;
+    color:var(--text-dim);
+    margin-bottom:6px;
+    letter-spacing:0.03em;
+  }
+
+  button{
+    font-family:var(--font-ui);
+    cursor:pointer;
+    border:none;
+    outline:none;
+  }
+  .btn{
+    width:100%;
+    padding:13px 18px;
+    border-radius:10px;
+    font-size:15px;
+    font-weight:600;
+    letter-spacing:0.02em;
+    transition:transform .08s ease, opacity .15s ease;
+  }
+  .btn:active{transform:scale(0.98);}
+  .btn-gold{background:linear-gradient(180deg, #d9b262, var(--gold)); color:#2b1f0a;}
+  .btn-outline{background:transparent; border:1px solid rgba(244,239,227,0.35); color:var(--text);}
+  .btn-outline:hover{border-color:var(--gold);}
+  .btn:disabled{opacity:0.35; cursor:default;}
+  .btn-small{padding:8px 14px; font-size:13px; border-radius:8px; width:auto;}
+  .link-btn{background:none; color:var(--text-dim); font-size:13px; text-decoration:underline; padding:4px;}
+
+  .divider-or{
+    display:flex; align-items:center; gap:10px; color:var(--text-dim); font-size:12px; width:100%; max-width:320px;
+  }
+  .divider-or::before, .divider-or::after{content:""; flex:1; height:1px; background:var(--felt-line);}
+
+  .stack{display:flex; flex-direction:column; gap:12px; width:100%; max-width:320px;}
+
+  /* ---- Lobby ---- */
+  .room-code-display{
+    text-align:center;
+    padding:18px 10px;
+    border:1px dashed rgba(201,162,75,0.5);
+    border-radius:14px;
+    background:var(--gold-soft);
+  }
+  .room-code-display .code{
+    font-family:var(--font-display);
+    font-size:40px;
+    letter-spacing:0.25em;
+    color:var(--gold);
+  }
+  .room-code-display .hint{font-size:11px; color:var(--text-dim); margin-top:6px;}
+
+  .player-list{width:100%; max-width:320px; display:flex; flex-direction:column; gap:8px;}
+  .player-row{
+    display:flex; align-items:center; gap:10px;
+    background:rgba(0,0,0,0.18);
+    border:1px solid var(--felt-line);
+    border-radius:10px;
+    padding:10px 12px;
+  }
+  .avatar{
+    width:30px; height:30px; border-radius:50%;
+    background:var(--gold); color:#2b1f0a;
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; font-weight:700; flex-shrink:0;
+  }
+  .player-row .name{flex:1; font-size:14px;}
+  .tag{font-size:10px; color:var(--text-dim); border:1px solid var(--felt-line); padding:2px 6px; border-radius:6px;}
+
+  /* ---- Game screen ---- */
+  .game-screen{flex:1; display:flex; flex-direction:column; min-height:0;}
+  .top-strip{
+    display:flex; gap:8px; overflow-x:auto; padding:4px 2px 10px;
+    scrollbar-width:none;
+  }
+  .top-strip::-webkit-scrollbar{display:none;}
+  .opp{
+    flex-shrink:0;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    padding:8px 10px;
+    border-radius:12px;
+    border:1px solid var(--felt-line);
+    background:rgba(0,0,0,0.15);
+    min-width:64px;
+    position:relative;
+  }
+  .opp.active{border-color:var(--gold); background:var(--gold-soft); box-shadow:0 0 0 1px var(--gold) inset;}
+  .opp.done{opacity:0.45;}
+  .opp .avatar{width:26px;height:26px;font-size:11px;}
+  .opp .oname{font-size:11px; max-width:60px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .opp .ocount{font-size:10px; color:var(--gold);}
+  .opp .orank{position:absolute; top:-6px; right:-6px; background:var(--gold); color:#2b1f0a; font-size:9px; font-weight:700; border-radius:50%; width:16px; height:16px; display:flex; align-items:center; justify-content:center;}
+
+  .table-area{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    min-height:150px;
+    position:relative;
+    border-top:1px solid var(--felt-line);
+    border-bottom:1px solid var(--felt-line);
+    padding:14px 0;
+    gap:8px;
+  }
+  .field-cards{display:flex; gap:-8px;}
+  .field-empty{color:var(--text-dim); font-size:13px; font-style:normal;}
+  .turn-banner{
+    font-size:13px; color:var(--text-dim); text-align:center; min-height:18px;
+  }
+  .turn-banner.mine{color:var(--gold); font-weight:700;}
+
+  .log-line{
+    font-size:11px; color:var(--text-dim); text-align:center; min-height:14px; padding-bottom:4px;
+  }
+
+  .playing-card{
+    width:42px; height:60px;
+    background:var(--ivory);
+    border-radius:6px;
+    border:1px solid rgba(0,0,0,0.25);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-size:15px; font-weight:700;
+    box-shadow:0 2px 4px rgba(0,0,0,0.35);
+    color:var(--ink);
+    flex-shrink:0;
+    user-select:none;
+  }
+  .playing-card.red{color:var(--red);}
+  .playing-card .pip{font-size:12px; margin-top:-2px;}
+  .field-cards .playing-card{margin-left:-14px;}
+  .field-cards .playing-card:first-child{margin-left:0;}
+
+  .hand-area{padding-top:10px;}
+  .hand-label{display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--text-dim); margin-bottom:6px;}
+  .hand-scroll{
+    display:flex; gap:6px; overflow-x:auto; padding:6px 2px 10px;
+    scrollbar-width:none;
+  }
+  .hand-scroll::-webkit-scrollbar{display:none;}
+  .hand-scroll .playing-card{cursor:pointer; transition:transform .12s ease, box-shadow .12s ease;}
+  .hand-scroll .playing-card.sel{transform:translateY(-10px); box-shadow:0 0 0 2px var(--gold), 0 4px 8px rgba(0,0,0,0.4);}
+
+  .actions-row{display:flex; gap:10px; padding-top:4px;}
+  .actions-row .btn{flex:1;}
+
+  .toast{
+    position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
+    background:rgba(20,20,20,0.92); color:var(--text);
+    padding:10px 16px; border-radius:10px; font-size:13px;
+    border:1px solid var(--felt-line);
+    z-index:50; max-width:80%; text-align:center;
+  }
+
+  .result-list{width:100%; max-width:320px; display:flex; flex-direction:column; gap:8px;}
+  .result-row{
+    display:flex; align-items:center; gap:12px;
+    background:rgba(0,0,0,0.18);
+    border:1px solid var(--felt-line);
+    border-radius:10px; padding:12px 14px;
+  }
+  .result-row .place{font-family:var(--font-display); font-size:22px; color:var(--gold); width:34px; text-align:center;}
+  .result-row.first{border-color:var(--gold); background:var(--gold-soft);}
+
+  .top-nav{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
+  .code-pill{font-size:11px; color:var(--gold); border:1px solid rgba(201,162,75,0.4); padding:3px 8px; border-radius:20px; letter-spacing:0.1em;}
+
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- storage helpers ----------
+  async function getShared(key){
+    try{ const r = await window.storage.get(key, true); return r ? JSON.parse(r.value) : null; }
+    catch(e){ return null; }
+  }
+  async function setShared(key, obj){
+    try{ return await window.storage.set(key, JSON.stringify(obj), true); }
+    catch(e){ return null; }
+  }
+  async function getPersonal(key){
+    try{ const r = await window.storage.get(key, false); return r ? JSON.parse(r.value) : null; }
+    catch(e){ return null; }
+  }
+  async function setPersonal(key, obj){
+    try{ return await window.storage.set(key, JSON.stringify(obj), false); }
+    catch(e){ return null; }
+  }
+
+  // ---------- card helpers ----------
+  const SUITS = [
+    {id:"S", sym:"♠", red:false},
+    {id:"H", sym:"♥", red:true},
+    {id:"D", sym:"♦", red:true},
+    {id:"C", sym:"♣", red:false}
+  ];
+  const RANKS = [3,4,5,6,7,8,9,10,11,12,13,14,15]; // 15 = "2" (strongest)
+  function rankLabel(r){
+    if(r===11) return "J";
+    if(r===12) return "Q";
+    if(r===13) return "K";
+    if(r===14) return "A";
+    if(r===15) return "2";
+    return String(r);
+  }
+  function makeCard(rank, suitId){ return suitId + "-" + rank; }
+  function cardRank(c){ return parseInt(c.split("-")[1], 10); }
+  function cardSuit(c){ return c.split("-")[0]; }
+  function suitInfo(id){ return SUITS.find(s=>s.id===id); }
+
+  function freshDeck(){
+    const deck = [];
+    SUITS.forEach(s => RANKS.forEach(r => deck.push(makeCard(r, s.id))));
+    return deck;
+  }
+  function shuffle(arr){
+    const a = arr.slice();
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]] = [a[j],a[i]];
+    }
+    return a;
+  }
+  function dealHands(players){
+    const deck = shuffle(freshDeck());
+    const hands = {};
+    players.forEach(p => hands[p.id] = []);
+    let i = 0;
+    while(deck.length){
+      hands[players[i % players.length].id].push(deck.pop());
+      i++;
+    }
+    Object.keys(hands).forEach(id => hands[id].sort((a,b)=>cardRank(a)-cardRank(b) || cardSuit(a).localeCompare(cardSuit(b))));
+    return hands;
+  }
+
+  function genCode(){
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let s = "";
+    for(let i=0;i<4;i++) s += chars[Math.floor(Math.random()*chars.length)];
+    return s;
+  }
+  function genId(){
+    return "p" + Math.random().toString(36).slice(2,10);
+  }
+  function roomKey(code){ return "daifugo_room_" + code; }
+
+  // ---------- app state ----------
+  let me = { id: null, name: null };
+  let screen = "loading"; // loading | name | home | create | join | lobby | game | result
+  let joinCodeInput = "";
+  let nameInput = "";
+  let currentRoomCode = null;
+  let room = null; // latest shared room state
+  let selected = new Set(); // selected card strings in hand
+  let toastMsg = null;
+  let toastTimer = null;
+  let pollTimer = null;
+  let busy = false;
+
+  function showToast(msg){
+    toastMsg = msg;
+    render();
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>{ toastMsg = null; render(); }, 2200);
+  }
+
+  // ---------- game logic (pure-ish, operates on room object) ----------
+  function activePlayers(st){
+    const finishedIds = new Set(st.finished.map(f=>f.id));
+    return st.players.filter(p=>!finishedIds.has(p.id));
+  }
+  function nextActiveId(st, fromId){
+    const idx = st.players.findIndex(p=>p.id===fromId);
+    const finishedIds = new Set(st.finished.map(f=>f.id));
+    for(let i=1;i<=st.players.length;i++){
+      const cand = st.players[(idx+i) % st.players.length];
+      if(!finishedIds.has(cand.id)) return cand.id;
+    }
+    return fromId;
+  }
+  function pushLog(st, text){
+    st.log = st.log || [];
+    st.log.push(text);
+    if(st.log.length > 6) st.log = st.log.slice(-6);
+  }
+  function nameOf(st, id){
+    const p = st.players.find(p=>p.id===id);
+    return p ? p.name : "???";
+  }
+
+  function tryFinishGame(st){
+    const remaining = activePlayers(st);
+    if(remaining.length <= 1){
+      if(remaining.length === 1){
+        st.finished.push({id: remaining[0].id, name: remaining[0].name, rank: st.finished.length+1});
+      }
+      st.ended = true;
+      st.turnPlayerId = null;
+      pushLog(st, "ゲーム終了！");
+    }
+  }
+
+  function applyPlay(st, myId, cards){
+    const hand = st.hands[myId];
+    cards.forEach(c=>{
+      const i = hand.indexOf(c);
+      if(i>=0) hand.splice(i,1);
+    });
+    const rank = cardRank(cards[0]);
+    const count = cards.length;
+    const isEight = rank === 8;
+    st.field = { cards: cards.slice(), rank, count, byId: myId };
+    st.passedIds = [];
+    st.lastPlayerId = myId;
+    pushLog(st, nameOf(st, myId) + "が" + rankLabel(rank) + "を" + count + "枚出した");
+
+    const isFinishing = hand.length === 0;
+    if(isFinishing){
+      st.finished.push({id: myId, name: nameOf(st, myId), rank: st.finished.length+1});
+      pushLog(st, nameOf(st, myId) + "があがり！(" + st.finished.length + "位)");
+    }
+    if(isEight){
+      st.field = null;
+      st.passedIds = [];
+      pushLog(st, "8切り！場が流れた");
+    }
+
+    tryFinishGame(st);
+    if(!st.ended){
+      if(isEight && !isFinishing){
+        st.turnPlayerId = myId; // leads again
+      } else {
+        st.turnPlayerId = nextActiveId(st, myId);
+      }
+    }
+  }
+
+  function applyPass(st, myId){
+    st.passedIds = st.passedIds || [];
+    if(!st.passedIds.includes(myId)) st.passedIds.push(myId);
+    pushLog(st, nameOf(st, myId) + "はパス");
+
+    const active = activePlayers(st);
+    const finishedIds = new Set(st.finished.map(f=>f.id));
+    const ownerActive = st.lastPlayerId && !finishedIds.has(st.lastPlayerId);
+    const required = ownerActive ? active.length - 1 : active.length;
+    const distinctPasses = st.passedIds.filter(id=>!finishedIds.has(id));
+
+    if(distinctPasses.length >= Math.max(required,1)){
+      st.field = null;
+      st.passedIds = [];
+      pushLog(st, "場が流れた");
+      const leader = ownerActive ? st.lastPlayerId : nextActiveId(st, st.lastPlayerId || myId);
+      st.turnPlayerId = leader;
+    } else {
+      st.turnPlayerId = nextActiveId(st, myId);
+    }
+  }
+
+  // ---------- networking actions ----------
+  async function createRoom(){
+    if(busy) return; busy = true;
+    const code = genCode();
+    const initial = {
+      code,
+      hostId: me.id,
+      createdAt: Date.now(),
+      players: [{id: me.id, name: me.name}],
+      started: false,
+      ended: false,
+      hands: {},
+      field: null,
+      passedIds: [],
+      lastPlayerId: null,
+      turnPlayerId: null,
+      finished: [],
+      log: ["ルームを作成しました"]
+    };
+    await setShared(roomKey(code), initial);
+    await setPersonal("daifugo_active_room", {code});
+    currentRoomCode = code;
+    room = initial;
+    screen = "lobby";
+    busy = false;
+    startPolling();
+    render();
+  }
+
+  async function joinRoom(code){
+    if(busy) return; busy = true;
+    code = (code||"").trim().toUpperCase();
+    if(!code){ busy=false; showToast("ルームコードを入力してください"); return; }
+    const st = await getShared(roomKey(code));
+    if(!st){ busy=false; showToast("そのルームが見つかりません"); return; }
+    if(!st.players.find(p=>p.id===me.id)){
+      if(st.started){ busy=false; showToast("このゲームはすでに開始しています"); return; }
+      if(st.players.length >= 4){ busy=false; showToast("満員です（最大4人）"); return; }
+      st.players.push({id: me.id, name: me.name});
+      pushLog(st, me.name + "が参加しました");
+      await setShared(roomKey(code), st);
+    }
+    await setPersonal("daifugo_active_room", {code});
+    currentRoomCode = code;
+    room = st;
+    screen = st.started ? "game" : "lobby";
+    busy = false;
+    startPolling();
+    render();
+  }
+
+  async function startGame(){
+    if(busy) return; busy = true;
+    const st = await getShared(roomKey(currentRoomCode)) || room;
+    if(st.players.length < 2){ busy=false; showToast("2人以上で開始できます"); return; }
+    st.hands = dealHands(st.players);
+    st.started = true;
+    st.ended = false;
+    st.field = null;
+    st.passedIds = [];
+    st.lastPlayerId = null;
+    st.finished = [];
+    st.turnPlayerId = st.players[0].id;
+    st.log = ["ゲーム開始！" + nameOf(st, st.players[0].id) + "のリードです"];
+    await setShared(roomKey(currentRoomCode), st);
+    room = st;
+    screen = "game";
+    busy = false;
+    render();
+  }
+
+  function isValidSelection(st, cards){
+    if(cards.length === 0) return {ok:false, reason:"カードを選んでください"};
+    const rank = cardRank(cards[0]);
+    if(!cards.every(c=>cardRank(c)===rank)) return {ok:false, reason:"同じ数字のカードを選んでください"};
+    if(st.field){
+      if(cards.length !== st.field.count) return {ok:false, reason:"場と同じ枚数を出してください（" + st.field.count + "枚）"};
+      if(rank <= st.field.rank) return {ok:false, reason:"場より強いカードを出してください"};
+    }
+    return {ok:true};
+  }
+
+  async function doPlay(){
+    if(busy) return;
+    const cards = Array.from(selected);
+    const st = room;
+    const check = isValidSelection(st, cards);
+    if(!check.ok){ showToast(check.reason); return; }
+    busy = true;
+    const fresh = await getShared(roomKey(currentRoomCode)) || st;
+    if(fresh.turnPlayerId !== me.id){ busy=false; showToast("あなたの番ではありません"); return; }
+    applyPlay(fresh, me.id, cards);
+    await setShared(roomKey(currentRoomCode), fresh);
+    room = fresh;
+    selected = new Set();
+    busy = false;
+    screen = fresh.ended ? "result" : "game";
+    render();
+  }
+
+  async function doPass(){
+    if(busy) return;
+    busy = true;
+    const fresh = await getShared(roomKey(currentRoomCode)) || room;
+    if(fresh.turnPlayerId !== me.id){ busy=false; showToast("あなたの番ではありません"); return; }
+    if(!fresh.field){ busy=false; showToast("最初の手番はパスできません"); return; }
+    applyPass(fresh, me.id);
+    await setShared(roomKey(currentRoomCode), fresh);
+    room = fresh;
+    busy = false;
+    render();
+  }
+
+  async function leaveRoom(){
+    stopPolling();
+    await setPersonal("daifugo_active_room", null);
+    currentRoomCode = null;
+    room = null;
+    selected = new Set();
+    screen = "home";
+    render();
+  }
+
+  function startPolling(){
+    stopPolling();
+    pollTimer = setInterval(async ()=>{
+      if(!currentRoomCode || busy) return;
+      const st = await getShared(roomKey(currentRoomCode));
+      if(!st) return;
+      room = st;
+      if(screen === "lobby" && st.started){ screen = "game"; }
+      if(st.ended && screen !== "result"){ screen = "result"; }
+      render();
+    }, 1600);
+  }
+  function stopPolling(){ if(pollTimer){ clearInterval(pollTimer); pollTimer = null; } }
+
+  // ---------- rendering ----------
+  const el = (tag, cls, html) => { const e = document.createElement(tag); if(cls) e.className = cls; if(html!==undefined) e.innerHTML = html; return e; };
+
+  function cardEl(card, small){
+    const suit = suitInfo(cardSuit(card));
+    const d = el("div", "playing-card" + (suit.red ? " red" : ""));
+    d.innerHTML = '<div>' + rankLabel(cardRank(card)) + '</div><div class="pip">' + suit.sym + '</div>';
+    return d;
+  }
+
+  function renderApp(){
+    const app = document.getElementById("app");
+    app.innerHTML = "";
+
+    const brand = el("div", "brand", "大富豪オンライン<small>ONLINE CARD PARLOUR</small>");
+    if(screen !== "game" && screen !== "result") app.appendChild(brand);
+
+    if(screen === "loading"){
+      app.appendChild(el("div", "center-screen", ""));
+    } else if(screen === "name"){
+      renderNameScreen(app);
+    } else if(screen === "home"){
+      renderHomeScreen(app);
+    } else if(screen === "create"){
+      renderCreateScreen(app);
+    } else if(screen === "join"){
+      renderJoinScreen(app);
+    } else if(screen === "lobby"){
+      renderLobbyScreen(app);
+    } else if(screen === "game"){
+      renderGameScreen(app);
+    } else if(screen === "result"){
+      renderResultScreen(app);
+    }
+
+    if(toastMsg){
+      app.appendChild(el("div", "toast", toastMsg));
+    }
+  }
+  function render(){ renderApp(); }
+
+  function renderNameScreen(app){
+    const wrap = el("div", "center-screen");
+    wrap.appendChild(el("div", "title-block",
+      '<h1>大富豪オンライン</h1><p>友達とオンラインで遊べるカードゲーム</p><div class="suit-row">♠ <span class="r">♥</span> ♣ <span class="r">♦</span></div>'));
+    const box = el("div", "stack");
+    box.appendChild(el("label", "field-label", "あなたの名前"));
+    const input = el("input");
+    input.type = "text";
+    input.placeholder = "たとえば：たろう";
+    input.maxLength = 10;
+    input.value = nameInput;
+    input.addEventListener("input", e => nameInput = e.target.value);
+    box.appendChild(input);
+    const btn = el("button", "btn btn-gold", "はじめる");
+    btn.addEventListener("click", async ()=>{
+      const n = nameInput.trim();
+      if(!n){ showToast("名前を入力してください"); return; }
+      me.name = n;
+      await setPersonal("daifugo_profile", {id: me.id, name: me.name});
+      screen = "home";
+      render();
+    });
+    box.appendChild(btn);
+    wrap.appendChild(box);
+    app.appendChild(wrap);
+  }
+
+  function renderHomeScreen(app){
+    const wrap = el("div", "center-screen");
+    wrap.appendChild(el("div", "title-block",
+      '<h1>大富豪オンライン</h1><p>' + escapeHtml(me.name) + 'さん、3〜4人で遊ぼう</p><div class="suit-row">♠ <span class="r">♥</span> ♣ <span class="r">♦</span></div>'));
+    const box = el("div", "stack");
+    const b1 = el("button", "btn btn-gold", "ルームを作る");
+    b1.addEventListener("click", createRoom);
+    box.appendChild(b1);
+    box.appendChild(el("div", "divider-or", "または"));
+    const b2 = el("button", "btn btn-outline", "コードで参加する");
+    b2.addEventListener("click", ()=>{ screen = "join"; render(); });
+    box.appendChild(b2);
+    wrap.appendChild(box);
+    app.appendChild(wrap);
+  }
+
+  function renderJoinScreen(app){
+    const wrap = el("div", "center-screen");
+    wrap.appendChild(el("div", "title-block", '<h1>参加する</h1><p>友達から聞いた4文字のコードを入力してください</p>'));
+    const box = el("div", "stack");
+    const input = el("input");
+    input.className = "code-input";
+    input.type = "text";
+    input.maxLength = 4;
+    input.placeholder = "AB3D";
+    input.value = joinCodeInput;
+    input.addEventListener("input", e => joinCodeInput = e.target.value.toUpperCase());
+    box.appendChild(input);
+    const b1 = el("button", "btn btn-gold", "参加する");
+    b1.addEventListener("click", ()=>joinRoom(joinCodeInput));
+    box.appendChild(b1);
+    const b2 = el("button", "btn link-btn", "戻る");
+    b2.addEventListener("click", ()=>{ screen = "home"; render(); });
+    box.appendChild(b2);
+    wrap.appendChild(box);
+    app.appendChild(wrap);
+  }
+
+  function renderCreateScreen(app){ renderHomeScreen(app); }
+
+  function renderLobbyScreen(app){
+    const wrap = el("div", "center-screen");
+    wrap.appendChild(el("div", "room-code-display",
+      '<div class="code">' + currentRoomCode + '</div><div class="hint">このコードを友達に伝えて「コードで参加する」から入力してもらってね</div>'));
+
+    const list = el("div", "player-list");
+    (room.players||[]).forEach(p=>{
+      const row = el("div", "player-row");
+      row.appendChild(el("div", "avatar", escapeHtml(p.name.slice(0,1))));
+      row.appendChild(el("div", "name", escapeHtml(p.name)));
+      if(p.id === room.hostId) row.appendChild(el("div", "tag", "ホスト"));
+      if(p.id === me.id) row.appendChild(el("div", "tag", "あなた"));
+      list.appendChild(row);
+    });
+    wrap.appendChild(list);
+
+    if(me.id === room.hostId){
+      const startBtn = el("button", "btn btn-gold", "ゲーム開始（" + room.players.length + "人）");
+      startBtn.style.maxWidth = "320px";
+      startBtn.disabled = room.players.length < 2;
+      startBtn.addEventListener("click", startGame);
+      wrap.appendChild(startBtn);
+      if(room.players.length < 2){
+        wrap.appendChild(el("div", "hand-label", "あと1人以上、友達の参加を待っています…"));
+      }
+    } else {
+      wrap.appendChild(el("div", "hand-label", "ホストがゲームを開始するのを待っています…"));
+    }
+
+    const leaveBtn = el("button", "btn link-btn", "ルームを退出する");
+    leaveBtn.addEventListener("click", leaveRoom);
+    wrap.appendChild(leaveBtn);
+
+    app.appendChild(wrap);
+  }
+
+  function renderGameScreen(app){
+    const st = room;
+    const game = el("div", "game-screen");
+
+    const topNav = el("div", "top-nav");
+    topNav.appendChild(el("div", "brand", "大富豪オンライン"));
+    topNav.appendChild(el("div", "code-pill", currentRoomCode));
+    game.appendChild(topNav);
+
+    // opponents strip (all players incl. self, self highlighted differently not needed since hand shown below)
+    const strip = el("div", "top-strip");
+    const finishedIds = new Set((st.finished||[]).map(f=>f.id));
+    st.players.forEach(p=>{
+      const isMe = p.id === me.id;
+      const cls = "opp" + (p.id===st.turnPlayerId ? " active":"") + (finishedIds.has(p.id) ? " done":"");
+      const o = el("div", cls);
+      o.appendChild(el("div", "avatar", escapeHtml(p.name.slice(0,1))));
+      o.appendChild(el("div", "oname", escapeHtml(p.name) + (isMe ? "（あなた）" : "")));
+      const handLen = (st.hands && st.hands[p.id]) ? st.hands[p.id].length : 0;
+      o.appendChild(el("div", "ocount", finishedIds.has(p.id) ? "あがり" : handLen + "枚"));
+      const fin = (st.finished||[]).find(f=>f.id===p.id);
+      if(fin) o.appendChild(el("div", "orank", String(fin.rank)));
+      strip.appendChild(o);
+    });
+    game.appendChild(strip);
+
+    // table area
+    const table = el("div", "table-area");
+    const turnText = st.turnPlayerId === me.id ? "あなたの番です" : (nameOf(st, st.turnPlayerId) + "さんの番です");
+    table.appendChild(el("div", "turn-banner" + (st.turnPlayerId===me.id ? " mine":""), turnText));
+    const fieldWrap = el("div", "field-cards");
+    if(st.field && st.field.cards && st.field.cards.length){
+      st.field.cards.forEach(c => fieldWrap.appendChild(cardEl(c)));
+    } else {
+      fieldWrap.appendChild(el("div", "field-empty", "（場は空です）"));
+    }
+    table.appendChild(fieldWrap);
+    const lastLog = (st.log && st.log.length) ? st.log[st.log.length-1] : "";
+    table.appendChild(el("div", "log-line", lastLog));
+    game.appendChild(table);
+
+    // hand area
+    const myHand = (st.hands && st.hands[me.id]) ? st.hands[me.id] : [];
+    const handArea = el("div", "hand-area");
+    handArea.appendChild(el("div", "hand-label", '<span>あなたの手札（' + myHand.length + '枚）</span>'));
+    const scroll = el("div", "hand-scroll");
+    myHand.forEach(c=>{
+      const ce = cardEl(c);
+      if(selected.has(c)) ce.classList.add("sel");
+      ce.addEventListener("click", ()=>{
+        if(st.turnPlayerId !== me.id || finishedIds.has(me.id)) return;
+        if(selected.has(c)) selected.delete(c); else selected.add(c);
+        render();
+      });
+      scroll.appendChild(ce);
+    });
+    handArea.appendChild(scroll);
+
+    const myTurn = st.turnPlayerId === me.id && !finishedIds.has(me.id) && !st.ended;
+    const actions = el("div", "actions-row");
+    const playBtn = el("button", "btn btn-gold", selected.size ? "出す（" + selected.size + "枚）" : "出す");
+    playBtn.disabled = !myTurn || selected.size===0;
+    playBtn.addEventListener("click", doPlay);
+    actions.appendChild(playBtn);
+    if(st.field){
+      const passBtn = el("button", "btn btn-outline", "パス");
+      passBtn.disabled = !myTurn;
+      passBtn.addEventListener("click", doPass);
+      actions.appendChild(passBtn);
+    }
+    handArea.appendChild(actions);
+
+    if(finishedIds.has(me.id) && !st.ended){
+      handArea.appendChild(el("div", "hand-label", "あがりました！他のプレイヤーの様子を見守りましょう"));
+    }
+
+    game.appendChild(handArea);
+    app.appendChild(game);
+  }
+
+  function renderResultScreen(app){
+    const wrap = el("div", "center-screen");
+    wrap.appendChild(el("div", "title-block", '<h1>結果発表</h1><p>お疲れさまでした</p>'));
+    const list = el("div", "result-list");
+    const ranks = ["1位", "2位", "3位", "4位"];
+    (room.finished||[]).slice().sort((a,b)=>a.rank-b.rank).forEach(f=>{
+      const row = el("div", "result-row" + (f.rank===1 ? " first":""));
+      row.appendChild(el("div", "place", ranks[f.rank-1] || (f.rank+"位")));
+      row.appendChild(el("div", "name", escapeHtml(f.name) + (f.id===me.id ? "（あなた）":"")));
+      list.appendChild(row);
+    });
+    wrap.appendChild(list);
+
+    if(me.id === room.hostId){
+      const again = el("button", "btn btn-gold", "もう一度遊ぶ");
+      again.style.maxWidth = "320px";
+      again.addEventListener("click", startGame);
+      wrap.appendChild(again);
+    } else {
+      wrap.appendChild(el("div", "hand-label", "ホストが次のゲームを始めるのを待っています…"));
+    }
+    const leaveBtn = el("button", "btn link-btn", "ルームを退出する");
+    leaveBtn.addEventListener("click", leaveRoom);
+    wrap.appendChild(leaveBtn);
+    app.appendChild(wrap);
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+  }
+
+  // also poll while in result screen so late finishers see it / host restart is seen by others
+  setInterval(async ()=>{
+    if((screen==="result") && currentRoomCode && !busy){
+      const st = await getShared(roomKey(currentRoomCode));
+      if(st){
+        room = st;
+        if(st.started && !st.ended){ screen = "game"; render(); }
+      }
+    }
+  }, 1600);
+
+  // ---------- init ----------
+  async function init(){
+    let profile = await getPersonal("daifugo_profile");
+    if(!profile){
+      profile = { id: genId(), name: null };
+      await setPersonal("daifugo_profile", profile);
+    }
+    me.id = profile.id;
+    me.name = profile.name;
+
+    if(!me.name){
+      screen = "name";
+      render();
+      return;
+    }
+
+    const active = await getPersonal("daifugo_active_room");
+    if(active && active.code){7
+      const st = await getShared(roomKey(active.code));
+      if(st && st.players.find(p=>p.id===me.id)){
+        currentRoomCode = active.code;
+        room = st;
+        screen = st.started ? (st.ended ? "result" : "game") : "lobby";
+        startPolling();
+        render();
+        return;
+      }
+    }
+    screen = "home";
+    render();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
