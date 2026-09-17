@@ -302,8 +302,16 @@ const firebaseConfig = {
   measurementId: "G-J1Y9VZGWXY"
 };
   // ▲▲▲ ここまで ▲▲▲
-  firebase.initializeApp(FIREBASE_CONFIG);
-  const fbdb = firebase.database();
+  const FIREBASE_NOT_CONFIGURED = FIREBASE_CONFIG.apiKey === "YOUR_API_KEY";
+  let fbdb = null;
+  if(!FIREBASE_NOT_CONFIGURED){
+    try{
+      firebase.initializeApp(FIREBASE_CONFIG);
+      fbdb = firebase.database();
+    }catch(e){
+      console.error("Firebase init failed:", e);
+    }
+  }
 </script>
 
 <script>
@@ -312,15 +320,19 @@ const firebaseConfig = {
 
   // ---------- storage helpers (Firebase Realtime Database + localStorage) ----------
   function getShared(key){
-    return fbdb.ref(key).once("value").then(snap => snap.exists() ? snap.val() : null).catch(()=>null);
+    if(!fbdb) return Promise.reject(new Error("firebase-not-ready"));
+    return fbdb.ref(key).once("value").then(snap => snap.exists() ? snap.val() : null);
   }
   function setShared(key, obj){
-    return fbdb.ref(key).set(obj).catch(()=>null);
+    if(!fbdb) return Promise.reject(new Error("firebase-not-ready"));
+    return fbdb.ref(key).set(obj);
   }
   function watchShared(key, cb){
+    if(!fbdb) return ()=>{};
     const ref = fbdb.ref(key);
     const handler = snap => cb(snap.exists() ? snap.val() : null);
-    ref.on("value", handler);
+    const errHandler = err => showToast("通信エラー：" + err.message);
+    ref.on("value", handler, errHandler);
     return () => ref.off("value", handler);
   }
   function getPersonal(key){
@@ -509,72 +521,97 @@ const firebaseConfig = {
   // ---------- networking actions ----------
   async function createRoom(){
     if(busy) return; busy = true;
-    const code = genCode();
-    const initial = {
-      code,
-      hostId: me.id,
-      createdAt: Date.now(),
-      players: [{id: me.id, name: me.name}],
-      started: false,
-      ended: false,
-      hands: {},
-      field: null,
-      passedIds: [],
-      lastPlayerId: null,
-      turnPlayerId: null,
-      finished: [],
-      log: ["ルームを作成しました"]
-    };
-    await setShared(roomKey(code), initial);
-    await setPersonal("daifugo_active_room", {code});
-    currentRoomCode = code;
-    room = initial;
-    screen = "lobby";
-    busy = false;
-    startPolling();
-    render();
+    if(FIREBASE_NOT_CONFIGURED || !fbdb){
+      busy = false;
+      showToast("Firebaseの設定がまだです。FIREBASE_CONFIGを書き換えてください");
+      return;
+    }
+    try{
+      const code = genCode();
+      const initial = {
+        code,
+        hostId: me.id,
+        createdAt: Date.now(),
+        players: [{id: me.id, name: me.name}],
+        started: false,
+        ended: false,
+        hands: {},
+        field: null,
+        passedIds: [],
+        lastPlayerId: null,
+        turnPlayerId: null,
+        finished: [],
+        log: ["ルームを作成しました"]
+      };
+      await setShared(roomKey(code), initial);
+      await setPersonal("daifugo_active_room", {code});
+      currentRoomCode = code;
+      room = initial;
+      screen = "lobby";
+      startPolling();
+      render();
+    }catch(e){
+      showToast("ルーム作成に失敗しました：" + e.message);
+    }finally{
+      busy = false;
+    }
   }
 
   async function joinRoom(code){
     if(busy) return; busy = true;
+    if(FIREBASE_NOT_CONFIGURED || !fbdb){
+      busy = false;
+      showToast("Firebaseの設定がまだです。FIREBASE_CONFIGを書き換えてください");
+      return;
+    }
     code = (code||"").trim().toUpperCase();
     if(!code){ busy=false; showToast("ルームコードを入力してください"); return; }
-    const st = await getShared(roomKey(code));
-    if(!st){ busy=false; showToast("そのルームが見つかりません"); return; }
-    if(!st.players.find(p=>p.id===me.id)){
-      if(st.started){ busy=false; showToast("このゲームはすでに開始しています"); return; }
-      if(st.players.length >= 4){ busy=false; showToast("満員です（最大4人）"); return; }
-      st.players.push({id: me.id, name: me.name});
-      pushLog(st, me.name + "が参加しました");
-      await setShared(roomKey(code), st);
+    try{
+      const st = await getShared(roomKey(code));
+      if(!st){ showToast("そのルームが見つかりません"); return; }
+      if(!st.players.find(p=>p.id===me.id)){
+        if(st.started){ showToast("このゲームはすでに開始しています"); return; }
+        if(st.players.length >= 4){ showToast("満員です（最大4人）"); return; }
+        st.players.push({id: me.id, name: me.name});
+        pushLog(st, me.name + "が参加しました");
+        await setShared(roomKey(code), st);
+      }
+      await setPersonal("daifugo_active_room", {code});
+      currentRoomCode = code;
+      room = st;
+      screen = st.started ? "game" : "lobby";
+      startPolling();
+      render();
+    }catch(e){
+      showToast("参加に失敗しました：" + e.message);
+    }finally{
+      busy = false;
     }
-    await setPersonal("daifugo_active_room", {code});
-    currentRoomCode = code;
-    room = st;
-    screen = st.started ? "game" : "lobby";
-    busy = false;
-    startPolling();
-    render();
   }
 
   async function startGame(){
     if(busy) return; busy = true;
-    const st = await getShared(roomKey(currentRoomCode)) || room;
-    if(st.players.length < 2){ busy=false; showToast("2人以上で開始できます"); return; }
-    st.hands = dealHands(st.players);
-    st.started = true;
-    st.ended = false;
-    st.field = null;
-    st.passedIds = [];
-    st.lastPlayerId = null;
-    st.finished = [];
-    st.turnPlayerId = st.players[0].id;
-    st.log = ["ゲーム開始！" + nameOf(st, st.players[0].id) + "のリードです"];
-    await setShared(roomKey(currentRoomCode), st);
-    room = st;
-    screen = "game";
-    busy = false;
-    render();
+    try{
+      const st = await getShared(roomKey(currentRoomCode)) || room;
+      if(st.players.length < 2){ showToast("2人以上で開始できます"); return; }
+      st.hands = dealHands(st.players);
+      st.started = true;
+      st.ended = false;
+      st.field = null;
+      st.passedIds = [];
+      st.lastPlayerId = null;
+      st.finished = [];
+      st.turnPlayerId = st.players[0].id;
+      st.log = ["ゲーム開始！" + nameOf(st, st.players[0].id) + "のリードです"];
+      await setShared(roomKey(currentRoomCode), st);
+      room = st;
+      screen = "game";
+      render();
+    }catch(e){
+      showToast("開始に失敗しました：" + e.message);
+    }finally{
+      busy = false;
+    }
   }
 
   function isValidSelection(st, cards){
@@ -595,28 +632,38 @@ const firebaseConfig = {
     const check = isValidSelection(st, cards);
     if(!check.ok){ showToast(check.reason); return; }
     busy = true;
-    const fresh = await getShared(roomKey(currentRoomCode)) || st;
-    if(fresh.turnPlayerId !== me.id){ busy=false; showToast("あなたの番ではありません"); return; }
-    applyPlay(fresh, me.id, cards);
-    await setShared(roomKey(currentRoomCode), fresh);
-    room = fresh;
-    selected = new Set();
-    busy = false;
-    screen = fresh.ended ? "result" : "game";
-    render();
+    try{
+      const fresh = await getShared(roomKey(currentRoomCode)) || st;
+      if(fresh.turnPlayerId !== me.id){ showToast("あなたの番ではありません"); return; }
+      applyPlay(fresh, me.id, cards);
+      await setShared(roomKey(currentRoomCode), fresh);
+      room = fresh;
+      selected = new Set();
+      screen = fresh.ended ? "result" : "game";
+      render();
+    }catch(e){
+      showToast("通信に失敗しました：" + e.message);
+    }finally{
+      busy = false;
+    }
   }
 
   async function doPass(){
     if(busy) return;
     busy = true;
-    const fresh = await getShared(roomKey(currentRoomCode)) || room;
-    if(fresh.turnPlayerId !== me.id){ busy=false; showToast("あなたの番ではありません"); return; }
-    if(!fresh.field){ busy=false; showToast("最初の手番はパスできません"); return; }
-    applyPass(fresh, me.id);
-    await setShared(roomKey(currentRoomCode), fresh);
-    room = fresh;
-    busy = false;
-    render();
+    try{
+      const fresh = await getShared(roomKey(currentRoomCode)) || room;
+      if(fresh.turnPlayerId !== me.id){ showToast("あなたの番ではありません"); return; }
+      if(!fresh.field){ showToast("最初の手番はパスできません"); return; }
+      applyPass(fresh, me.id);
+      await setShared(roomKey(currentRoomCode), fresh);
+      room = fresh;
+      render();
+    }catch(e){
+      showToast("通信に失敗しました：" + e.message);
+    }finally{
+      busy = false;
+    }
   }
 
   async function leaveRoom(){
@@ -715,6 +762,9 @@ const firebaseConfig = {
     wrap.appendChild(el("div", "title-block",
       '<h1>大富豪オンライン</h1><p>' + escapeHtml(me.name) + 'さん、3〜4人で遊ぼう</p><div class="suit-row">♠ <span class="r">♥</span> ♣ <span class="r">♦</span></div>'));
     const box = el("div", "stack");
+    if(FIREBASE_NOT_CONFIGURED){
+      box.appendChild(el("div", "hand-label", "⚠️ Firebaseが未設定です。ファイル冒頭のFIREBASE_CONFIGを書き換えてください"));
+    }
     const b1 = el("button", "btn btn-gold", "ルームを作る");
     b1.addEventListener("click", createRoom);
     box.appendChild(b1);
