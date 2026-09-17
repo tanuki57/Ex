@@ -304,17 +304,15 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
   // ▼▼▼ ここを自分のFirebaseプロジェクトの値に書き換えてください ▼▼▼
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyC27Luj9mAarpNCtnCTuL2704z4HviBGkI",
-  authDomain: "daifugou-5.firebaseapp.com",
-  databaseURL: "https://daifugou-5-default-rtdb.firebaseio.com",
-  projectId: "daifugou-5",
-  storageBucket: "daifugou-5.firebasestorage.app",
-  messagingSenderId: "735805994095",
-  appId: "1:735805994095:web:5f436f0729152609c4099a",
-  measurementId: "G-J1Y9VZGWXY"
-};
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyC27Luj9mAarpNCtnCTuL2704z4HviBGkI",
+    authDomain: "daifugou-5.firebaseapp.com",
+    databaseURL: "https://daifugou-5-default-rtdb.firebaseio.com",
+    projectId: "daifugou-5",
+    storageBucket: "daifugou-5.firebasestorage.app",
+    messagingSenderId: "735805994095",
+    appId: "1:735805994095:web:5f436f0729152609c4099a"
+  };
   // ▲▲▲ ここまで ▲▲▲
   window.FIREBASE_CONFIGURED = (FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY");
   window.fbdb = null;
