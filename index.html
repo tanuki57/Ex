@@ -276,26 +276,63 @@
 <body>
 <div class="wrap" id="app"></div>
 
+<!-- ============================================================
+  Firebase セットアップ（無料）
+  1. https://console.firebase.google.com/ でプロジェクトを作成
+  2. 左メニュー「Realtime Database」→「データベースを作成」
+     ロケーションは任意、ルールは下記を設定：
+       { "rules": { ".read": true, ".write": true } }
+     （合言葉を知っている友達だけが遊ぶ想定の簡易設定です）
+  3. プロジェクト設定 →「全般」→「マイアプリ」→ウェブアプリ(</>)を追加
+  4. 表示された firebaseConfig の中身を、下の FIREBASE_CONFIG に貼り付ける
+============================================================= -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+  // ▼▼▼ ここを自分のFirebaseプロジェクトの値に書き換えてください ▼▼▼
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyC27Luj9mAarpNCtnCTuL2704z4HviBGkI",
+  authDomain: "daifugou-5.firebaseapp.com",
+  databaseURL: "https://daifugou-5-default-rtdb.firebaseio.com",
+  projectId: "daifugou-5",
+  storageBucket: "daifugou-5.firebasestorage.app",
+  messagingSenderId: "735805994095",
+  appId: "1:735805994095:web:5f436f0729152609c4099a",
+  measurementId: "G-J1Y9VZGWXY"
+};
+  // ▲▲▲ ここまで ▲▲▲
+  firebase.initializeApp(FIREBASE_CONFIG);
+  const fbdb = firebase.database();
+</script>
+
 <script>
 (function(){
   "use strict";
 
-  // ---------- storage helpers ----------
-  async function getShared(key){
-    try{ const r = await window.storage.get(key, true); return r ? JSON.parse(r.value) : null; }
-    catch(e){ return null; }
+  // ---------- storage helpers (Firebase Realtime Database + localStorage) ----------
+  function getShared(key){
+    return fbdb.ref(key).once("value").then(snap => snap.exists() ? snap.val() : null).catch(()=>null);
   }
-  async function setShared(key, obj){
-    try{ return await window.storage.set(key, JSON.stringify(obj), true); }
-    catch(e){ return null; }
+  function setShared(key, obj){
+    return fbdb.ref(key).set(obj).catch(()=>null);
   }
-  async function getPersonal(key){
-    try{ const r = await window.storage.get(key, false); return r ? JSON.parse(r.value) : null; }
-    catch(e){ return null; }
+  function watchShared(key, cb){
+    const ref = fbdb.ref(key);
+    const handler = snap => cb(snap.exists() ? snap.val() : null);
+    ref.on("value", handler);
+    return () => ref.off("value", handler);
   }
-  async function setPersonal(key, obj){
-    try{ return await window.storage.set(key, JSON.stringify(obj), false); }
-    catch(e){ return null; }
+  function getPersonal(key){
+    try{ const v = localStorage.getItem(key); return Promise.resolve(v ? JSON.parse(v) : null); }
+    catch(e){ return Promise.resolve(null); }
+  }
+  function setPersonal(key, obj){
+    try{
+      if(obj === null) localStorage.removeItem(key);
+      else localStorage.setItem(key, JSON.stringify(obj));
+    }catch(e){}
+    return Promise.resolve(null);
   }
 
   // ---------- card helpers ----------
@@ -594,17 +631,16 @@
 
   function startPolling(){
     stopPolling();
-    pollTimer = setInterval(async ()=>{
-      if(!currentRoomCode || busy) return;
-      const st = await getShared(roomKey(currentRoomCode));
+    pollTimer = watchShared(roomKey(currentRoomCode), (st)=>{
       if(!st) return;
       room = st;
-      if(screen === "lobby" && st.started){ screen = "game"; }
+      if(screen === "lobby" && st.started){ screen = st.ended ? "result" : "game"; }
       if(st.ended && screen !== "result"){ screen = "result"; }
+      if(!st.ended && screen === "result" && st.started){ screen = "game"; }
       render();
-    }, 1600);
+    });
   }
-  function stopPolling(){ if(pollTimer){ clearInterval(pollTimer); pollTimer = null; } }
+  function stopPolling(){ if(pollTimer){ pollTimer(); pollTimer = null; } }
 
   // ---------- rendering ----------
   const el = (tag, cls, html) => { const e = document.createElement(tag); if(cls) e.className = cls; if(html!==undefined) e.innerHTML = html; return e; };
@@ -861,17 +897,6 @@
     return String(s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
   }
 
-  // also poll while in result screen so late finishers see it / host restart is seen by others
-  setInterval(async ()=>{
-    if((screen==="result") && currentRoomCode && !busy){
-      const st = await getShared(roomKey(currentRoomCode));
-      if(st){
-        room = st;
-        if(st.started && !st.ended){ screen = "game"; render(); }
-      }
-    }
-  }, 1600);
-
   // ---------- init ----------
   async function init(){
     let profile = await getPersonal("daifugo_profile");
@@ -889,7 +914,7 @@
     }
 
     const active = await getPersonal("daifugo_active_room");
-    if(active && active.code){7
+    if(active && active.code){
       const st = await getShared(roomKey(active.code));
       if(st && st.players.find(p=>p.id===me.id)){
         currentRoomCode = active.code;
