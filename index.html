@@ -316,12 +316,12 @@ const firebaseConfig = {
   measurementId: "G-J1Y9VZGWXY"
 };
   // ▲▲▲ ここまで ▲▲▲
-  const FIREBASE_NOT_CONFIGURED = FIREBASE_CONFIG.apiKey === "YOUR_API_KEY";
-  let fbdb = null;
-  if(!FIREBASE_NOT_CONFIGURED){
+  window.FIREBASE_CONFIGURED = (FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY");
+  window.fbdb = null;
+  if(window.FIREBASE_CONFIGURED){
     try{
       firebase.initializeApp(FIREBASE_CONFIG);
-      fbdb = firebase.database();
+      window.fbdb = firebase.database();
     }catch(e){
       console.error("Firebase init failed:", e);
       showDebug("Firebase初期化エラー: " + e.message);
@@ -335,16 +335,16 @@ const firebaseConfig = {
 
   // ---------- storage helpers (Firebase Realtime Database + localStorage) ----------
   function getShared(key){
-    if(!fbdb) return Promise.reject(new Error("firebase-not-ready"));
-    return fbdb.ref(key).once("value").then(snap => snap.exists() ? snap.val() : null);
+    if(!window.fbdb) return Promise.reject(new Error("firebase-not-ready"));
+    return window.fbdb.ref(key).once("value").then(snap => snap.exists() ? snap.val() : null);
   }
   function setShared(key, obj){
-    if(!fbdb) return Promise.reject(new Error("firebase-not-ready"));
-    return fbdb.ref(key).set(obj);
+    if(!window.fbdb) return Promise.reject(new Error("firebase-not-ready"));
+    return window.fbdb.ref(key).set(obj);
   }
   function watchShared(key, cb){
-    if(!fbdb) return ()=>{};
-    const ref = fbdb.ref(key);
+    if(!window.fbdb) return ()=>{};
+    const ref = window.fbdb.ref(key);
     const handler = snap => cb(snap.exists() ? snap.val() : null);
     const errHandler = err => showToast("通信エラー：" + err.message);
     ref.on("value", handler, errHandler);
@@ -536,12 +536,11 @@ const firebaseConfig = {
   // ---------- networking actions ----------
   async function createRoom(){
     if(busy) return; busy = true;
-    if(FIREBASE_NOT_CONFIGURED || !fbdb){
-      busy = false;
-      showToast("Firebaseの設定がまだです。FIREBASE_CONFIGを書き換えてください");
-      return;
-    }
     try{
+      if(!window.FIREBASE_CONFIGURED || !window.fbdb){
+        showToast("Firebaseの設定がまだです。FIREBASE_CONFIGを書き換えてください");
+        return;
+      }
       const code = genCode();
       const initial = {
         code,
@@ -574,14 +573,13 @@ const firebaseConfig = {
 
   async function joinRoom(code){
     if(busy) return; busy = true;
-    if(FIREBASE_NOT_CONFIGURED || !fbdb){
-      busy = false;
-      showToast("Firebaseの設定がまだです。FIREBASE_CONFIGを書き換えてください");
-      return;
-    }
-    code = (code||"").trim().toUpperCase();
-    if(!code){ busy=false; showToast("ルームコードを入力してください"); return; }
     try{
+      if(!window.FIREBASE_CONFIGURED || !window.fbdb){
+        showToast("Firebaseの設定がまだです。FIREBASE_CONFIGを書き換えてください");
+        return;
+      }
+      code = (code||"").trim().toUpperCase();
+      if(!code){ showToast("ルームコードを入力してください"); return; }
       const st = await getShared(roomKey(code));
       if(!st){ showToast("そのルームが見つかりません"); return; }
       if(!st.players.find(p=>p.id===me.id)){
@@ -718,6 +716,23 @@ const firebaseConfig = {
     const app = document.getElementById("app");
     app.innerHTML = "";
 
+    if(screen !== "loading" && screen !== "name"){
+      const nav = el("div", "top-nav");
+      const homeBtn = el("button", "btn-small btn-outline", "🏠 ホーム");
+      homeBtn.addEventListener("click", goHome);
+      nav.appendChild(homeBtn);
+      const rightWrap = el("div");
+      rightWrap.style.display = "flex";
+      rightWrap.style.gap = "8px";
+      rightWrap.style.alignItems = "center";
+      if(currentRoomCode) rightWrap.appendChild(el("div", "code-pill", currentRoomCode));
+      const nameBtn = el("button", "btn-small btn-outline", "✏️ " + escapeHtml(me.name||""));
+      nameBtn.addEventListener("click", ()=>{ nameInput = me.name||""; screen = "editname"; render(); });
+      rightWrap.appendChild(nameBtn);
+      nav.appendChild(rightWrap);
+      app.appendChild(nav);
+    }
+
     const brand = el("div", "brand", "大富豪オンライン<small>ONLINE CARD PARLOUR</small>");
     if(screen !== "game" && screen !== "result") app.appendChild(brand);
 
@@ -725,6 +740,8 @@ const firebaseConfig = {
       app.appendChild(el("div", "center-screen", ""));
     } else if(screen === "name"){
       renderNameScreen(app);
+    } else if(screen === "editname"){
+      renderEditNameScreen(app);
     } else if(screen === "home"){
       renderHomeScreen(app);
     } else if(screen === "create"){
@@ -744,6 +761,42 @@ const firebaseConfig = {
     }
   }
   function render(){ renderApp(); }
+
+  function goHome(){
+    if(currentRoomCode){ leaveRoom(); return; }
+    screen = "home";
+    render();
+  }
+
+  function renderEditNameScreen(app){
+    const wrap = el("div", "center-screen");
+    wrap.appendChild(el("div", "title-block", '<h1>名前を変更</h1><p>新しい名前を入力してください</p>'));
+    const box = el("div", "stack");
+    const input = el("input");
+    input.type = "text";
+    input.maxLength = 10;
+    input.value = nameInput;
+    input.addEventListener("input", e => nameInput = e.target.value);
+    box.appendChild(input);
+    const btn = el("button", "btn btn-gold", "保存する");
+    btn.addEventListener("click", async ()=>{
+      const n = nameInput.trim();
+      if(!n){ showToast("名前を入力してください"); return; }
+      me.name = n;
+      await setPersonal("daifugo_profile", {id: me.id, name: me.name});
+      screen = currentRoomCode ? (room && room.started ? (room.ended ? "result" : "game") : "lobby") : "home";
+      render();
+    });
+    box.appendChild(btn);
+    const cancel = el("button", "btn link-btn", "キャンセル");
+    cancel.addEventListener("click", ()=>{
+      screen = currentRoomCode ? (room && room.started ? (room.ended ? "result" : "game") : "lobby") : "home";
+      render();
+    });
+    box.appendChild(cancel);
+    wrap.appendChild(box);
+    app.appendChild(wrap);
+  }
 
   function renderNameScreen(app){
     const wrap = el("div", "center-screen");
@@ -777,7 +830,7 @@ const firebaseConfig = {
     wrap.appendChild(el("div", "title-block",
       '<h1>大富豪オンライン</h1><p>' + escapeHtml(me.name) + 'さん、3〜4人で遊ぼう</p><div class="suit-row">♠ <span class="r">♥</span> ♣ <span class="r">♦</span></div>'));
     const box = el("div", "stack");
-    if(FIREBASE_NOT_CONFIGURED){
+    if(!window.FIREBASE_CONFIGURED){
       box.appendChild(el("div", "hand-label", "⚠️ Firebaseが未設定です。ファイル冒頭のFIREBASE_CONFIGを書き換えてください"));
     }
     const b1 = el("button", "btn btn-gold", "ルームを作る");
@@ -854,11 +907,6 @@ const firebaseConfig = {
   function renderGameScreen(app){
     const st = room;
     const game = el("div", "game-screen");
-
-    const topNav = el("div", "top-nav");
-    topNav.appendChild(el("div", "brand", "大富豪オンライン"));
-    topNav.appendChild(el("div", "code-pill", currentRoomCode));
-    game.appendChild(topNav);
 
     // opponents strip (all players incl. self, self highlighted differently not needed since hand shown below)
     const strip = el("div", "top-strip");
@@ -999,4 +1047,3 @@ const firebaseConfig = {
 </script>
 </body>
 </html>
-
