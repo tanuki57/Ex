@@ -332,9 +332,21 @@
   "use strict";
 
   // ---------- storage helpers (Firebase Realtime Database + localStorage) ----------
+  // Firebase RTDB silently drops empty arrays/objects on write, so any room
+  // state read back from the DB must have its collection fields re-defaulted.
+  function normalizeRoom(st){
+    if(!st) return st;
+    st.players = st.players || [];
+    st.hands = st.hands || {};
+    st.field = st.field || null;
+    st.passedIds = st.passedIds || [];
+    st.finished = st.finished || [];
+    st.log = st.log || [];
+    return st;
+  }
   function getShared(key){
     if(!window.fbdb) return Promise.reject(new Error("firebase-not-ready"));
-    return window.fbdb.ref(key).once("value").then(snap => snap.exists() ? snap.val() : null);
+    return window.fbdb.ref(key).once("value").then(snap => snap.exists() ? normalizeRoom(snap.val()) : null);
   }
   function setShared(key, obj){
     if(!window.fbdb) return Promise.reject(new Error("firebase-not-ready"));
@@ -343,7 +355,7 @@
   function watchShared(key, cb){
     if(!window.fbdb) return ()=>{};
     const ref = window.fbdb.ref(key);
-    const handler = snap => cb(snap.exists() ? snap.val() : null);
+    const handler = snap => cb(snap.exists() ? normalizeRoom(snap.val()) : null);
     const errHandler = err => showToast("通信エラー：" + err.message);
     ref.on("value", handler, errHandler);
     return () => ref.off("value", handler);
