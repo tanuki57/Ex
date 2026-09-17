@@ -171,6 +171,35 @@
   .player-row .name{flex:1; font-size:14px;}
   .tag{font-size:10px; color:var(--text-dim); border:1px solid var(--felt-line); padding:2px 6px; border-radius:6px;}
 
+  .rules-box{width:100%; max-width:320px; display:flex; flex-direction:column; gap:8px;}
+  .rule-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:rgba(0,0,0,0.18); border:1px solid var(--felt-line); border-radius:10px;
+    padding:10px 12px;
+  }
+  .rule-row .rname{font-size:13px;}
+  .rule-row .rdesc{font-size:11px; color:var(--text-dim); margin-top:2px;}
+  .rule-toggle{
+    flex-shrink:0;
+    width:52px; height:28px; border-radius:14px;
+    background:rgba(244,239,227,0.15);
+    position:relative;
+    border:1px solid var(--felt-line);
+  }
+  .rule-toggle.on{background:var(--gold);}
+  .rule-toggle .knob{
+    position:absolute; top:2px; left:2px; width:22px; height:22px; border-radius:50%;
+    background:var(--ivory); transition:left .15s ease;
+  }
+  .rule-toggle.on .knob{ left:28px; background:#2b1f0a; }
+  .rule-toggle:disabled{opacity:0.5;}
+  .rule-status{font-size:11px; padding:2px 8px; border-radius:8px; border:1px solid var(--felt-line); color:var(--text-dim);}
+  .rule-status.on{color:var(--gold); border-color:rgba(201,162,75,0.5);}
+  .rules-text{width:100%; max-width:340px; font-size:13px; line-height:1.7; color:var(--text);}
+  .rules-text h3{font-family:var(--font-display); font-size:16px; color:var(--gold); margin:16px 0 6px;}
+  .rules-text ul{margin:0; padding-left:18px;}
+  .rules-text li{margin-bottom:4px;}
+
   /* ---- Game screen ---- */
   .game-screen{flex:1; display:flex; flex-direction:column; min-height:0;}
   .top-strip{
@@ -342,6 +371,10 @@
     st.passedIds = st.passedIds || [];
     st.finished = st.finished || [];
     st.log = st.log || [];
+    st.rules = st.rules || defaultRules();
+    if(typeof st.rules.eightCut === "undefined") st.rules.eightCut = true;
+    if(typeof st.rules.revolution === "undefined") st.rules.revolution = false;
+    st.revolutionActive = !!st.revolutionActive;
     return st;
   }
   function getShared(key){
@@ -473,6 +506,14 @@
     const p = st.players.find(p=>p.id===id);
     return p ? p.name : "???";
   }
+  function defaultRules(){ return { eightCut: true, revolution: false }; }
+  const RULE_DEFS = [
+    { key: "eightCut", name: "8切り", desc: "8を出すと場が流れて、そのまま自分のリードになる" },
+    { key: "revolution", name: "革命", desc: "同じ数字を4枚出すと、カードの強さが逆転する（もう一度発生すると元に戻る）" }
+  ];
+  function effectiveRank(st, rank){
+    return (st.revolutionActive) ? (18 - rank) : rank;
+  }
 
   function tryFinishGame(st){
     const remaining = activePlayers(st);
@@ -494,11 +535,18 @@
     });
     const rank = cardRank(cards[0]);
     const count = cards.length;
-    const isEight = rank === 8;
+    const rules = st.rules || defaultRules();
+    const isEight = !!rules.eightCut && rank === 8;
+    const isRevolution = !!rules.revolution && count === 4;
     st.field = { cards: cards.slice(), rank, count, byId: myId };
     st.passedIds = [];
     st.lastPlayerId = myId;
     pushLog(st, nameOf(st, myId) + "が" + rankLabel(rank) + "を" + count + "枚出した");
+
+    if(isRevolution){
+      st.revolutionActive = !st.revolutionActive;
+      pushLog(st, "革命！強さが逆転した");
+    }
 
     const isFinishing = hand.length === 0;
     if(isFinishing){
@@ -565,6 +613,8 @@
         lastPlayerId: null,
         turnPlayerId: null,
         finished: [],
+        rules: defaultRules(),
+        revolutionActive: false,
         log: ["ルームを作成しました"]
       };
       await setShared(roomKey(code), initial);
@@ -624,6 +674,7 @@
       st.passedIds = [];
       st.lastPlayerId = null;
       st.finished = [];
+      st.revolutionActive = false;
       st.turnPlayerId = st.players[0].id;
       st.log = ["ゲーム開始！" + nameOf(st, st.players[0].id) + "のリードです"];
       await setShared(roomKey(currentRoomCode), st);
@@ -637,13 +688,29 @@
     }
   }
 
+  async function toggleRule(key){
+    if(busy) return; busy = true;
+    try{
+      const st = await getShared(roomKey(currentRoomCode)) || room;
+      st.rules = st.rules || defaultRules();
+      st.rules[key] = !st.rules[key];
+      await setShared(roomKey(currentRoomCode), st);
+      room = st;
+      render();
+    }catch(e){
+      showToast("設定の変更に失敗しました：" + e.message);
+    }finally{
+      busy = false;
+    }
+  }
+
   function isValidSelection(st, cards){
     if(cards.length === 0) return {ok:false, reason:"カードを選んでください"};
     const rank = cardRank(cards[0]);
     if(!cards.every(c=>cardRank(c)===rank)) return {ok:false, reason:"同じ数字のカードを選んでください"};
     if(st.field){
       if(cards.length !== st.field.count) return {ok:false, reason:"場と同じ枚数を出してください（" + st.field.count + "枚）"};
-      if(rank <= st.field.rank) return {ok:false, reason:"場より強いカードを出してください"};
+      if(effectiveRank(st, rank) <= effectiveRank(st, st.field.rank)) return {ok:false, reason:"場より強いカードを出してください"};
     }
     return {ok:true};
   }
@@ -736,6 +803,9 @@
       rightWrap.style.gap = "8px";
       rightWrap.style.alignItems = "center";
       if(currentRoomCode) rightWrap.appendChild(el("div", "code-pill", currentRoomCode));
+      const rulesBtn = el("button", "btn-small btn-outline", "📖 ルール");
+      rulesBtn.addEventListener("click", ()=>{ screen = "rules"; render(); });
+      rightWrap.appendChild(rulesBtn);
       const nameBtn = el("button", "btn-small btn-outline", "✏️ " + escapeHtml(me.name||""));
       nameBtn.addEventListener("click", ()=>{ nameInput = me.name||""; screen = "editname"; render(); });
       rightWrap.appendChild(nameBtn);
@@ -752,6 +822,8 @@
       renderNameScreen(app);
     } else if(screen === "editname"){
       renderEditNameScreen(app);
+    } else if(screen === "rules"){
+      renderRulesScreen(app);
     } else if(screen === "home"){
       renderHomeScreen(app);
     } else if(screen === "create"){
@@ -777,6 +849,11 @@
     screen = "home";
     render();
   }
+  function contextScreen(){
+    if(!currentRoomCode) return "home";
+    if(!room || !room.started) return "lobby";
+    return room.ended ? "result" : "game";
+  }
 
   function renderEditNameScreen(app){
     const wrap = el("div", "center-screen");
@@ -794,13 +871,13 @@
       if(!n){ showToast("名前を入力してください"); return; }
       me.name = n;
       await setPersonal("daifugo_profile", {id: me.id, name: me.name});
-      screen = currentRoomCode ? (room && room.started ? (room.ended ? "result" : "game") : "lobby") : "home";
+      screen = contextScreen();
       render();
     });
     box.appendChild(btn);
     const cancel = el("button", "btn link-btn", "キャンセル");
     cancel.addEventListener("click", ()=>{
-      screen = currentRoomCode ? (room && room.started ? (room.ended ? "result" : "game") : "lobby") : "home";
+      screen = contextScreen();
       render();
     });
     box.appendChild(cancel);
@@ -808,8 +885,39 @@
     app.appendChild(wrap);
   }
 
-  function renderNameScreen(app){
+  function renderRulesScreen(app){
     const wrap = el("div", "center-screen");
+    wrap.appendChild(el("div", "title-block", '<h1>ルール</h1><p>基本の遊び方とハウスルール</p>'));
+    const box = el("div", "rules-text");
+    box.innerHTML =
+      '<h3>基本ルール</h3>' +
+      '<ul>' +
+      '<li>手番の人は、場に出ているカードより強い同じ枚数・同じ数字のカードを出す</li>' +
+      '<li>出せない・出したくない時は「パス」する</li>' +
+      '<li>他の全員がパスすると場が流れて、最後に出した人から再スタート</li>' +
+      '<li>強さは 3が一番弱く、4,5,6,7,8,9,10,J,Q,K,A,2 の順に強くなる（2が最強）</li>' +
+      '<li>手札が最初になくなった人が1位。順番にあがっていく</li>' +
+      '</ul>' +
+      '<h3>ハウスルール（ルーム作成者が設定）</h3>' +
+      '<ul>' +
+      RULE_DEFS.map(rd=>{
+        const on = room ? !!(room.rules && room.rules[rd.key]) : null;
+        const stateText = room ? (on ? "現在ON" : "現在OFF") : "";
+        return '<li><b>' + escapeHtml(rd.name) + '</b>：' + escapeHtml(rd.desc) + (stateText ? '（' + stateText + '）' : '') + '</li>';
+      }).join("") +
+      '</ul>';
+    if(!room){
+      box.innerHTML += '<p style="color:var(--text-dim); font-size:12px;">※ルームに参加すると、そのルームの設定状況が表示されます</p>';
+    }
+    wrap.appendChild(box);
+    const back = el("button", "btn btn-outline", "戻る");
+    back.style.maxWidth = "320px";
+    back.addEventListener("click", ()=>{ screen = contextScreen(); render(); });
+    wrap.appendChild(back);
+    app.appendChild(wrap);
+  }
+
+  function renderNameScreen(app){    const wrap = el("div", "center-screen");
     wrap.appendChild(el("div", "title-block",
       '<h1>大富豪オンライン</h1><p>友達とオンラインで遊べるカードゲーム</p><div class="suit-row">♠ <span class="r">♥</span> ♣ <span class="r">♦</span></div>'));
     const box = el("div", "stack");
@@ -894,6 +1002,27 @@
     });
     wrap.appendChild(list);
 
+    const rulesBox = el("div", "rules-box");
+    const isHost = me.id === room.hostId;
+    RULE_DEFS.forEach(rd=>{
+      const on = !!(room.rules && room.rules[rd.key]);
+      const row = el("div", "rule-row");
+      const left = el("div");
+      left.appendChild(el("div", "rname", rd.name));
+      left.appendChild(el("div", "rdesc", rd.desc));
+      row.appendChild(left);
+      if(isHost){
+        const toggle = el("button", "rule-toggle" + (on ? " on" : ""));
+        toggle.innerHTML = '<div class="knob"></div>';
+        toggle.addEventListener("click", ()=>toggleRule(rd.key));
+        row.appendChild(toggle);
+      } else {
+        row.appendChild(el("div", "rule-status" + (on ? " on" : ""), on ? "ON" : "OFF"));
+      }
+      rulesBox.appendChild(row);
+    });
+    wrap.appendChild(rulesBox);
+
     if(me.id === room.hostId){
       const startBtn = el("button", "btn btn-gold", "ゲーム開始（" + room.players.length + "人）");
       startBtn.style.maxWidth = "320px";
@@ -937,6 +1066,9 @@
 
     // table area
     const table = el("div", "table-area");
+    if(st.revolutionActive){
+      table.appendChild(el("div", "rule-status on", "🔃 革命中（強さ逆転）"));
+    }
     const turnText = st.turnPlayerId === me.id ? "あなたの番です" : (nameOf(st, st.turnPlayerId) + "さんの番です");
     table.appendChild(el("div", "turn-banner" + (st.turnPlayerId===me.id ? " mine":""), turnText));
     const fieldWrap = el("div", "field-cards");
@@ -1057,3 +1189,4 @@
 </script>
 </body>
 </html>
+
