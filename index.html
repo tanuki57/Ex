@@ -275,6 +275,20 @@
 </head>
 <body>
 <div class="wrap" id="app"></div>
+<div id="debugBanner" style="display:none; position:fixed; top:0; left:0; right:0; background:#7a1f1f; color:#fff; font-size:12px; padding:8px 10px; z-index:999; white-space:pre-wrap; word-break:break-all; font-family:monospace;"></div>
+<script>
+  function showDebug(msg){
+    var b = document.getElementById("debugBanner");
+    b.style.display = "block";
+    b.textContent = "⚠ " + msg;
+  }
+  window.addEventListener("error", function(e){
+    showDebug("JSエラー: " + e.message + " (" + (e.filename||"").split("/").pop() + ":" + e.lineno + ")");
+  });
+  window.addEventListener("unhandledrejection", function(e){
+    showDebug("未処理のPromiseエラー: " + (e.reason && e.reason.message ? e.reason.message : e.reason));
+  });
+</script>
 
 <!-- ============================================================
   Firebase セットアップ（無料）
@@ -310,6 +324,7 @@ const firebaseConfig = {
       fbdb = firebase.database();
     }catch(e){
       console.error("Firebase init failed:", e);
+      showDebug("Firebase初期化エラー: " + e.message);
     }
   }
 </script>
@@ -984,3 +999,4 @@ const firebaseConfig = {
 </script>
 </body>
 </html>
+
