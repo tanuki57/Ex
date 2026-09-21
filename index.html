@@ -25,15 +25,23 @@
   html,body{height:100%;}
   body{
     margin:0;
-    background:
-      radial-gradient(ellipse at 50% -10%, rgba(255,255,255,0.05), transparent 60%),
-      linear-gradient(180deg, var(--felt) 0%, var(--felt-dark) 100%);
+    background:var(--felt);
     color:var(--text);
     font-family:var(--font-ui);
     min-height:100vh;
     display:flex;
     flex-direction:column;
     overflow-x:hidden;
+    position:relative;
+  }
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    z-index:-1;
+    background:
+      radial-gradient(ellipse at 50% -10%, rgba(255,255,255,0.05), transparent 60%),
+      linear-gradient(180deg, var(--felt) 0%, var(--felt-dark) 100%);
   }
   .wrap{
     flex:1;
@@ -292,7 +300,11 @@
   }
   .hand-scroll .playing-card:first-child{ margin-left:0; }
   .hand-scroll .playing-card .pip{font-size:17px;}
-  .hand-scroll .playing-card.sel{transform:translateY(-14px); box-shadow:0 0 0 3px var(--gold), 0 5px 10px rgba(0,0,0,0.45); z-index:5;}
+  .hand-scroll .playing-card.sel{
+    box-shadow:0 0 0 3px var(--gold), 0 3px 10px rgba(201,162,75,0.5);
+    z-index:5;
+    filter:brightness(1.1);
+  }
   .hand-scroll .playing-card:hover{ z-index:4; }
 
   .actions-row{display:flex; gap:10px; padding-top:4px;}
