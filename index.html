@@ -294,13 +294,14 @@
   .hand-scroll::-webkit-scrollbar{display:none;}
   .hand-scroll .playing-card{
     width:60px; height:86px; font-size:21px; border-radius:9px;
-    cursor:pointer; transition:transform .12s ease, box-shadow .12s ease;
+    cursor:pointer; transition:top .12s ease, box-shadow .12s ease;
     margin-left:-26px;
+    position:relative; top:0;
   }
   .hand-scroll .playing-card:first-child{ margin-left:0; }
   .hand-scroll .playing-card .pip{font-size:17px;}
   .hand-scroll .playing-card.sel{
-    transform:translateY(-12px);
+    top:-12px;
     box-shadow:0 0 0 3px var(--gold), 0 3px 10px rgba(201,162,75,0.5);
     filter:brightness(1.1);
   }
@@ -856,9 +857,9 @@
     const isQueenReverse = !!rules.queenReverse && kind==="same" && rank===12;
     const isRevCut = !!rules.revolutionCut && st.revolutionActive && kind==="same" && count===1 && [5,6,7].includes(rank);
     const isElevenBack = !st.omenActive && !!rules.elevenBack && kind==="same" && rank===11;
-    const isSevenGive = !!rules.sevenGive && kind==="same" && rank===7 && count!==3;
-    const isTenDiscard = !!rules.tenDiscard && kind==="same" && rank===10 && !isTenReturn;
     const isLuckySeven = !!rules.luckySeven && kind==="same" && rank===7 && count===3;
+    const isSevenGive = !!rules.sevenGive && kind==="same" && rank===7 && !isLuckySeven;
+    const isTenDiscard = !!rules.tenDiscard && kind==="same" && rank===10 && !isTenReturn;
     const isNineGiveBack = !!rules.nineGiveBack && kind==="same" && rank===9 && count!==2;
 
     // 縛りの継続判定（オーメン発動中はカウントしない）
@@ -968,6 +969,11 @@
     }
     if((isFiveSkip || isTenSkip) && !isFinishing){
       nextId = nextActiveId(st, nextId);
+    }
+    if((isFiveSkip || isTenSkip) && !isFinishing && nextId === myId){
+      // スキップの結果、自分の番に戻ってきた（1対1など）：自分の場を流してリードし直す
+      clearField(st);
+      pushLog(st, "スキップで一周し、場が流れて" + nameOf(st, myId) + "のリードになりました");
     }
 
     if(isLuckySeven && !isFinishing){
