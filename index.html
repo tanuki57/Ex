@@ -413,6 +413,7 @@
     st.mustLeadDiamond3 = !!st.mustLeadDiamond3;
     st.pendingAction = st.pendingAction || null;
     st.lastField = st.lastField || null;
+    st.skippedThisField = st.skippedThisField || [];
     st.omenActive = !!st.omenActive;
     st.luckySevenPending = st.luckySevenPending || null;
     return st;
@@ -717,6 +718,7 @@
     st.passedIds = [];
     st.elevenBackActive = false;
     st.luckySevenPending = null;
+    st.skippedThisField = [];
     // 縛りはそのターン（場が流れるまで）限りなので、ここでリセットする
     st.suitLockValue = null;
     st.stairsLockActive = false;
@@ -831,36 +833,38 @@
     const rank = selInfo.rank;
     const count = cards.length;
     const noJoker = !cards.some(isJoker);
+    const isSpecialPlay = !!selInfo.special; // 同マーク下出し／エンペラー／砂嵐 等の特殊プレイ
+                                              // → 数字による汎用ルールを誤発動させない
 
-    const isEight = !st.omenActive && !!rules.eightCut && kind==="same" && rank===8 && !selInfo.special;
+    const isEight = !st.omenActive && !!rules.eightCut && kind==="same" && rank===8 && !isSpecialPlay;
     const isEightDelayed = isEight && !!rules.fourStop;
     const isEightInstant = isEight && !isEightDelayed;
-    const isNineCut = !!rules.nineCut && kind==="same" && rank===9 && count===2 && noJoker;
-    const isSixCut = !!rules.sixCut && kind==="same" && rank===6 && count===2 && noJoker;
-    const isQueenBomber = !!rules.queenBomber && kind==="same" && rank===12 && count>=1;
+    const isNineCut = !!rules.nineCut && kind==="same" && rank===9 && count===2 && noJoker && !isSpecialPlay;
+    const isSixCut = !!rules.sixCut && kind==="same" && rank===6 && count===2 && noJoker && !isSpecialPlay;
+    const isQueenBomber = !!rules.queenBomber && kind==="same" && rank===12 && count>=1 && !isSpecialPlay;
     const isFourStop = selInfo.special === "fourstop";
     const isSandstorm = selInfo.special === "sandstorm";
     const isEmperor = selInfo.special === "emperor";
     const isSevenCounter = selInfo.special === "sevencounter";
     const isTenReturn = selInfo.special === "tenreturn";
-    const isCoup = !!rules.coupCards && kind==="same" && rank===9 && count===3 && noJoker;
-    const isGrandRevolution = !!rules.grandRevolution && kind==="same" && rank===15 && count===4 && noJoker;
-    const isOmenTrigger = !!rules.omen && kind==="same" && rank===6 && count===3 && noJoker;
+    const isCoup = !!rules.coupCards && kind==="same" && rank===9 && count===3 && noJoker && !isSpecialPlay;
+    const isGrandRevolution = !!rules.grandRevolution && kind==="same" && rank===15 && count===4 && noJoker && !isSpecialPlay;
+    const isOmenTrigger = !!rules.omen && kind==="same" && rank===6 && count===3 && noJoker && !isSpecialPlay;
     const isRevolution = !st.omenActive && (
-      (!!rules.revolution && kind==="same" && count===4) ||
+      (!!rules.revolution && kind==="same" && count===4 && !isSpecialPlay) ||
       (!!rules.stairsRevolution && kind==="run" && count>=4) ||
       isCoup || isGrandRevolution || isEmperor
     );
-    const isFiveSkip = !!rules.fiveSkip && kind==="same" && rank===5;
-    const isTenSkip = !!rules.tenSkip && kind==="same" && rank===10 && !isTenReturn;
-    const isNineReverse = !!rules.nineReverse && kind==="same" && rank===9 && !isNineCut;
-    const isQueenReverse = !!rules.queenReverse && kind==="same" && rank===12;
-    const isRevCut = !!rules.revolutionCut && st.revolutionActive && kind==="same" && count===1 && [5,6,7].includes(rank);
-    const isElevenBack = !st.omenActive && !!rules.elevenBack && kind==="same" && rank===11;
-    const isLuckySeven = !!rules.luckySeven && kind==="same" && rank===7 && count===3;
-    const isSevenGive = !!rules.sevenGive && kind==="same" && rank===7 && !isLuckySeven;
-    const isTenDiscard = !!rules.tenDiscard && kind==="same" && rank===10 && !isTenReturn;
-    const isNineGiveBack = !!rules.nineGiveBack && kind==="same" && rank===9 && count!==2;
+    const isFiveSkip = !!rules.fiveSkip && kind==="same" && rank===5 && !isSpecialPlay;
+    const isTenSkip = !!rules.tenSkip && kind==="same" && rank===10 && !isTenReturn && !isSpecialPlay;
+    const isNineReverse = !!rules.nineReverse && kind==="same" && rank===9 && !isNineCut && !isSpecialPlay;
+    const isQueenReverse = !!rules.queenReverse && kind==="same" && rank===12 && !isSpecialPlay;
+    const isRevCut = !!rules.revolutionCut && st.revolutionActive && kind==="same" && count===1 && [5,6,7].includes(rank) && !isSpecialPlay;
+    const isElevenBack = !st.omenActive && !!rules.elevenBack && kind==="same" && rank===11 && !isSpecialPlay;
+    const isLuckySeven = !!rules.luckySeven && kind==="same" && rank===7 && count===3 && !isSpecialPlay;
+    const isSevenGive = !!rules.sevenGive && kind==="same" && rank===7 && !isLuckySeven && !isSpecialPlay;
+    const isTenDiscard = !!rules.tenDiscard && kind==="same" && rank===10 && !isTenReturn && !isSpecialPlay;
+    const isNineGiveBack = !!rules.nineGiveBack && kind==="same" && rank===9 && count!==2 && !isSpecialPlay;
 
     // 縛りの継続判定（オーメン発動中はカウントしない）
     if(!st.omenActive && rules.suitLock && !st.suitLockValue){
@@ -892,6 +896,7 @@
     st.field = { cards: cards.slice(), rank, count, kind, byId: myId };
     if(isEightDelayed) st.field.cutPending = true;
     st.passedIds = [];
+    st.skippedThisField = [];
     st.lastPlayerId = myId;
     if(isEmperor){
       pushLog(st, nameOf(st, myId) + "がエンペラーを出した！");
@@ -968,7 +973,11 @@
       nextId = nextActiveId(st, myId);
     }
     if((isFiveSkip || isTenSkip) && !isFinishing){
+      const skippedPlayer = nextId;
       nextId = nextActiveId(st, nextId);
+      if(skippedPlayer !== myId){
+        st.skippedThisField = (st.skippedThisField || []).concat(skippedPlayer);
+      }
     }
     if((isFiveSkip || isTenSkip) && !isFinishing && nextId === myId){
       // スキップの結果、自分の番に戻ってきた（1対1など）：自分の場を流してリードし直す
@@ -1081,9 +1090,11 @@
 
     const active = activePlayers(st);
     const finishedIds = new Set(st.finished.map(f=>f.id));
+    const skippedIds = new Set((st.skippedThisField||[]).filter(id=>!finishedIds.has(id)));
     const ownerActive = st.lastPlayerId && !finishedIds.has(st.lastPlayerId);
-    const required = ownerActive ? active.length - 1 : active.length;
-    const distinctPasses = st.passedIds.filter(id=>!finishedIds.has(id));
+    const responders = active.filter(p=>!(ownerActive && p.id===st.lastPlayerId) && !skippedIds.has(p.id));
+    const required = responders.length;
+    const distinctPasses = st.passedIds.filter(id=>!finishedIds.has(id) && !skippedIds.has(id));
 
     if(distinctPasses.length >= Math.max(required,1)){
       const leader = ownerActive ? st.lastPlayerId : nextActiveId(st, st.lastPlayerId || myId);
@@ -1101,7 +1112,13 @@
       if(st.ended){ finalizeBannedRanks(st); return; }
       st.turnPlayerId = leaderFinished ? nextActiveId(st, leader) : leader;
     } else {
-      st.turnPlayerId = nextActiveId(st, myId);
+      let next = nextActiveId(st, myId);
+      let guard = 0;
+      while(skippedIds.has(next) && next !== myId && guard < st.players.length + 2){
+        next = nextActiveId(st, next);
+        guard++;
+      }
+      st.turnPlayerId = next;
     }
   }
 
